@@ -1,0 +1,27 @@
+# Render Blueprint — deploys the signal-intelligence FastAPI backend.
+# In the Render dashboard: New → Blueprint → point at this repo. It reads
+# this file. Set the secret env vars (GEMINI_API_KEY, OPENWEATHER_API_KEY)
+# in the service's Environment tab — they are intentionally NOT in git.
+#
+# After it deploys you get a URL like https://sentinel-backend.onrender.com
+# Put that into wrangler.jsonc → vars.SENTINEL_API_URL and redeploy the Worker.
+services:
+  - type: web
+    name: sentinel-backend
+    runtime: python
+    plan: free
+    rootDir: signal-intelligence-main
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/ciro/status
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: LLM_PROVIDER
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
