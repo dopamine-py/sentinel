@@ -6,11 +6,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEY = 'sentinel.apiBase';
 
-// Defaults: web ↦ localhost, native ↦ hosted ngrok tunnel.
-// Override at runtime in Settings (great for plugging your own IP during dev).
+// Default to the public Render backend so an installed APK works with live
+// data out of the box — no localhost, no ngrok, no config needed.
+// Running the FastAPI backend locally? Override the API base in Settings
+// (e.g. http://localhost:8000 or your LAN IP).
+const RENDER_BACKEND = 'https://sentinel-backend-cupp.onrender.com';
 const DEFAULTS = {
-  web: 'http://localhost:8000',
-  native: 'https://nonvocationally-semicommercial-avery.ngrok-free.dev',
+  web: RENDER_BACKEND,
+  native: RENDER_BACKEND,
 };
 
 let _override = null;
