@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CIRO — Live Feed</title>
+  <meta name="description" content="Real-time autonomous crisis detection from Pakistani news, weather and social signals." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* ── Live Feed overrides ── */
+    .live-layout { display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; }
+    @media (max-width: 900px) { .live-layout { grid-template-columns: 1fr; } }
+
+    /* Nav tabs in header */
+    .header-nav { display: flex; gap: 4px; }
+    .nav-tab { padding: 6px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-muted, #8b90a7); text-decoration: none; transition: all .2s; border: 1px solid transparent; }
+    .nav-tab:hover { color: #fff; background: rgba(255,255,255,0.06); }
+    .nav-tab.active { color: #fff; background: rgba(255,59,92,0.15); border-color: rgba(255,59,92,0.3); }
+
+    /* Scan trigger card */
+    .scan-card { }
+    .scan-btn { width: 100%; padding: 14px; background: linear-gradient(135deg,#ff3b5c,#ff7043); border: none; border-radius: 12px; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity .2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; }
+    .scan-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .scan-btn:hover:not(:disabled) { opacity: .9; }
+
+    .auto-badge { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 10px 14px; background: rgba(0,229,192,0.08); border: 1px solid rgba(0,229,192,0.2); border-radius: 10px; font-size: 12px; color: #00e5c0; }
+    .auto-dot { width: 7px; height: 7px; border-radius: 50%; background: #00e5c0; animation: pulse 1.5s infinite; flex-shrink: 0; }
+
+    /* Source chips */
+    .sources-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+    .source-chip { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg3, #161929); border-radius: 8px; font-size: 12px; }
+    .source-chip .s-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .source-chip .s-name { font-weight: 600; color: #e2e4ef; }
+    .source-chip .s-desc { color: var(--text-muted,#8b90a7); margin-left: auto; }
+
+    /* Signal feed */
+    .feed-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .feed-title { font-size: 15px; font-weight: 600; color: #e2e4ef; }
+    .feed-count { font-size: 12px; color: var(--text-muted,#8b90a7); }
+    .signal-feed { display: flex; flex-direction: column; gap: 10px; }
+    .signal-item { padding: 12px 14px; background: var(--bg3,#161929); border-radius: 10px; border-left: 3px solid; transition: border-color .2s; }
+    .signal-item.social { border-color: #3b82f6; }
+    .signal-item.weather { border-color: #00e5c0; }
+    .signal-item.traffic { border-color: #f97316; }
+    .signal-tag.traffic { background: rgba(249,115,22,0.15); color: #f97316; }
+    .congestion-bar { height: 4px; background: #1e2240; border-radius: 2px; overflow: hidden; margin-top: 6px; }
+    .congestion-fill { height: 100%; border-radius: 2px; }
+    .signal-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .signal-tag { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; letter-spacing: .5px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
+    .signal-tag.social { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    .signal-tag.weather { background: rgba(0,229,192,0.12); color: #00e5c0; }
+    .signal-tag.search { background: rgba(124,58,237,0.15); color: #7c3aed; }
+    .signal-source { font-size: 11px; color: var(--text-muted,#8b90a7); font-family: 'JetBrains Mono', monospace; }
+    .signal-text { font-size: 13px; color: #c8cad8; line-height: 1.5; }
+    .signal-kws { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .kw-chip { font-size: 10px; padding: 2px 6px; background: rgba(255,59,92,0.1); color: #ff6b7a; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+    .signal-time { font-size: 10px; color: var(--text-muted,#8b90a7); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+    
+    .feed-tab { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--glass-border); background: var(--bg3); color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .feed-tab:hover { background: var(--glass); color: #fff; }
+    .feed-tab.active { background: rgba(59,130,246,0.15); color: #3b82f6; border-color: rgba(59,130,246,0.3); }
+
+    /* Result banner */
+    .result-banner { padding: 16px 20px; border-radius: 14px; margin-bottom: 16px; border: 1px solid; }
+    .result-banner.crisis { background: rgba(255,59,92,0.08); border-color: rgba(255,59,92,0.3); }
+    .result-banner.clear { background: rgba(0,229,192,0.06); border-color: rgba(0,229,192,0.2); }
+    .result-banner.scanning { background: rgba(255,165,0,0.06); border-color: rgba(255,165,0,0.2); }
+    .banner-row { display: flex; align-items: center; gap: 10px; }
+    .banner-icon { font-size: 22px; }
+    .banner-title { font-size: 16px; font-weight: 700; color: #e2e4ef; }
+    .banner-sub { font-size: 12px; color: var(--text-muted,#8b90a7); margin-top: 2px; }
+
+    /* Stat row */
+    .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+    .stat-box { padding: 12px; background: var(--bg2,#0f1120); border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); text-align: center; }
+    .stat-val { font-size: 22px; font-weight: 800; color: #e2e4ef; font-family: 'JetBrains Mono', monospace; }
+    .stat-val.teal { color: #00e5c0; }
+    .stat-val.red { color: #ff3b5c; }
+    .stat-label { font-size: 11px; color: var(--text-muted,#8b90a7); margin-top: 3px; }
+
+    /* Empty state */
+    .empty-feed { text-align: center; padding: 40px 20px; color: var(--text-muted,#8b90a7); }
+    .empty-feed .empty-icon { font-size: 36px; margin-bottom: 10px; }
+
+    /* Timestamp */
+    .last-scan { font-size: 11px; color: var(--text-muted,#8b90a7); font-family: 'JetBrains Mono', monospace; margin-top: 10px; }
+
+    /* Loading spinner */
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Crisis inline card */
+    .inline-crisis { margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <img src="logo.png" alt="CIRO Logo" style="height:48px; border-radius: 12px; box-shadow: 0 0 15px rgba(255,42,85,0.4);" />
+        <div class="logo-text" style="display:flex; flex-direction:column; justify-content:center; margin-left: 12px;">
+          <span class="logo-name" style="font-size: 1.4rem; letter-spacing: 1px;">CIRO</span>
+          <span class="logo-sub" style="font-size: 0.75rem;">Crisis Intelligence & Response Orchestrator</span>
+        </div>
+      </div>
+      <nav class="header-nav">
+        <a href="index.html" class="nav-tab">Dashboard</a>
+        <a href="live.html" class="nav-tab active">Live Feed</a>
+      </nav>
+      <div class="header-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="live-layout">
+    <!-- Left sidebar -->
+    <aside>
+      <!-- Scan trigger -->
+      <section class="card scan-card">
+        <h2 class="card-title">📡 Live Scanner</h2>
+        <p style="font-size:13px;color:#8b90a7;margin-bottom:14px;line-height:1.6">
+          Pulls real signals from Pakistani news, live weather, and web search — no manual input needed.
+        </p>
+        <button class="scan-btn" id="scanBtn" onclick="triggerScan()">
+          <span id="scanBtnIcon">📡</span> Scan Now
+        </button>
+        <div class="auto-badge">
+          <div class="auto-dot"></div>
+          Auto-scan every 10 min in background
+        </div>
+        <p class="last-scan" id="lastScanTime">Last scan: —</p>
+      </section>
+
+      <!-- Active sources -->
+      <section class="card" style="margin-top:16px">
+        <h2 class="card-title">🔌 Active Sources</h2>
+        <div class="sources-list">
+          <div class="source-chip">
+            <div class="s-dot" style="background:#3b82f6"></div>
+            <span class="s-name">News RSS</span>
+            <span class="s-desc">6 feeds</span>
+          </div>
+          <div class="source-chip">
+            <div class="s-dot" style="background:#3b82f6"></div>
+            <span class="s-name">Dawn</span>
+            <span class="s-desc">dawn.com</span>
+          </div>
+          <div class="source-chip">
+            <div class="s-dot" style="background:#3b82f6"></div>
+            <span class="s-name">Geo News</span>
+            <span class="s-desc">geo.tv</span>
+          </div>
+          <div class="source-chip">
+            <div class="s-dot" style="background:#3b82f6"></div>
+            <span class="s-name">ARY News</span>
+            <span class="s-desc">arynews.tv</span>
+          </div>
+          <div class="source-chip">
+            <div class="s-dot" style="background:#3b82f6"></div>
+            <span class="s-name">Express Tribune</span>
+            <span class="s-desc">tribune.com.pk</span>
+          </div>
+          <div class="source-chip">
+            <div class="s-dot" style="background:#f97316"></div>
+            <span class="s-name">Traffic API</span>
+            <span class="s-desc">7 corridors</span>
+          </div>
+            <span class="s-desc" id="wxStatus">Key activating…</span>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Main content -->
+    <div>
+      <!-- Stats row -->
+      <div class="stat-row">
+        <div class="stat-box">
+          <div class="stat-val" id="statSignals">—</div>
+          <div class="stat-label">Signals pulled</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="statCrises">—</div>
+          <div class="stat-label">Crises detected</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val teal" id="statStatus">IDLE</div>
+          <div class="stat-label">System status</div>
+        </div>
+      </div>
+
+      <!-- Result banner -->
+      <div id="resultBanner" class="result-banner clear" style="display:none">
+        <div class="banner-row">
+          <span class="banner-icon" id="bannerIcon">✅</span>
+          <div>
+            <div class="banner-title" id="bannerTitle">No crisis detected</div>
+            <div class="banner-sub" id="bannerSub">All signals analysed. Situation normal.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inline crisis result (if detected) -->
+      <div id="crisisInline" style="display:none" class="inline-crisis">
+        <section class="card result-card">
+          <div class="result-header">
+            <h2 class="card-title">🚨 Detected Crisis</h2>
+            <div id="liveSeverityBadge" class="badge"></div>
+          </div>
+          <div class="crisis-grid">
+            <div class="crisis-field"><span class="field-label">Type</span><span class="field-value" id="liveCrisisType">—</span></div>
+            <div class="crisis-field"><span class="field-label">Location</span><span class="field-value" id="liveCrisisLoc">—</span></div>
+            <div class="crisis-field"><span class="field-label">Confidence</span><span class="field-value" id="liveCrisisConf">—</span></div>
+            <div class="crisis-field"><span class="field-label">Severity</span><span class="field-value" id="liveCrisisSev">—</span></div>
+          </div>
+          <p class="crisis-description" id="liveCrisisDesc"></p>
+          <div style="margin-top:10px;font-size:13px;color:#8b90a7">
+            <a href="index.html" style="color:#ff3b5c;text-decoration:none;font-weight:600">→ Open full response plan in Dashboard</a>
+          </div>
+        </section>
+      </div>
+
+      <!-- Signal feed -->
+      <section class="card">
+        <div class="feed-header">
+          <span class="feed-title">📰 Live Signal Feed</span>
+          <span class="feed-count" id="feedCount">No signals yet</span>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="feed-tabs" id="feedTabs" style="display:none; gap:8px; margin-bottom:16px;">
+          <button class="feed-tab active" onclick="switchFeedTab('all')">All Signals</button>
+          <button class="feed-tab" onclick="switchFeedTab('news')">Crisis News</button>
+          <button class="feed-tab" onclick="switchFeedTab('weather')">Weather</button>
+          <button class="feed-tab" onclick="switchFeedTab('traffic')">Traffic</button>
+        </div>
+
+        <div id="signalFeed" class="signal-feed">
+          <div class="empty-feed">
+            <div class="empty-icon">📡</div>
+            <p>Click <strong>Scan Now</strong> to pull live signals from Pakistani news &amp; weather sources.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+    let totalScans = 0;
+    let totalCrises = 0;
+    let totalSignals = 0;
+
+    function setStatus(text, running = false) {
+      document.getElementById('statusText').textContent = text;
+      document.getElementById('statusDot').className = 'status-dot' + (running ? ' running' : '');
+    }
+
+    function sourceTag(src) {
+      if (src === 'weather_api') return 'weather';
+      if (src === 'traffic_api') return 'traffic';
+      return 'social';
+    }
+
+    function sourceLabel(src) {
+      if (src === 'weather_api') return 'WEATHER';
+      if (src === 'traffic_api') return 'TRAFFIC';
+      return 'NEWS';
+    }
+
+    function timeSince(iso) {
+      if (!iso) return '';
+      const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+      if (diff < 60) return `${diff}s ago`;
+      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+      return new Date(iso).toLocaleTimeString();
+    }
+
+    let currentSignals = [];
+    let currentTab = 'all';
+
+    function switchFeedTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.feed-tab').forEach(b => b.classList.remove('active'));
+      document.querySelector(`.feed-tab[onclick*="${tab}"]`).classList.add('active');
+      renderSignalsList();
+    }
+
+    function renderSignalsList() {
+      const feed = document.getElementById('signalFeed');
+      let filtered = currentSignals;
+      if (currentTab === 'news') filtered = currentSignals.filter(s => sourceTag(s.source) === 'social');
+      if (currentTab === 'weather') filtered = currentSignals.filter(s => sourceTag(s.source) === 'weather');
+      if (currentTab === 'traffic') filtered = currentSignals.filter(s => sourceTag(s.source) === 'traffic');
+
+      if (!filtered || filtered.length === 0) {
+        feed.innerHTML = '<div class="empty-feed"><div class="empty-icon">🔍</div><p>No signals in this category.</p></div>';
+        document.getElementById('feedCount').textContent = '0 signals';
+        return;
+      }
+
+      document.getElementById('feedCount').textContent = `${filtered.length} signal${filtered.length !== 1 ? 's' : ''}`;
+      feed.innerHTML = '';
+
+      filtered.forEach(sig => {
+        const cls = sourceTag(sig.source);
+        const label = sourceLabel(sig.source);
+        const sourceName = sig.metadata?.source_name || sig.metadata?.city || sig.source;
+        const kws = sig.metadata?.matched_keywords || [];
+        const div = document.createElement('div');
+        div.className = `signal-item ${cls}`;
+        div.innerHTML = `
+          <div class="signal-item-header">
+            <span class="signal-tag ${cls}">${label}</span>
+            <span class="signal-source">${sourceName}</span>
+          </div>
+          <div class="signal-text">${sig.raw_text.slice(0, 220)}${sig.raw_text.length > 220 ? '…' : ''}</div>
+          ${kws.length ? `<div class="signal-kws">${kws.map(k => `<span class="kw-chip">${k}</span>`).join('')}</div>` : ''}
+          <div class="signal-time">${timeSince(sig.timestamp)}</div>`;
+        feed.appendChild(div);
+      });
+    }
+
+    function renderSignals(signals) {
+      currentSignals = signals;
+      document.getElementById('feedTabs').style.display = 'flex';
+      renderSignalsList();
+    }
+
+    function renderResult(data) {
+      const crisis = data.detected_crisis;
+      const banner = document.getElementById('resultBanner');
+      banner.style.display = 'block';
+
+      if (crisis) {
+        totalCrises++;
+        banner.className = 'result-banner crisis';
+        document.getElementById('bannerIcon').textContent = '🚨';
+        document.getElementById('bannerTitle').textContent = `Crisis Detected: ${crisis.crisis_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`;
+        document.getElementById('bannerSub').textContent = `${crisis.location} · ${crisis.confidence_label} confidence · ${crisis.severity.toUpperCase()} severity`;
+
+        // Inline crisis card
+        document.getElementById('crisisInline').style.display = 'block';
+        document.getElementById('liveCrisisType').textContent = crisis.crisis_type.replace(/_/g, ' ');
+        document.getElementById('liveCrisisLoc').textContent = crisis.location;
+        document.getElementById('liveCrisisConf').textContent = `${crisis.confidence_label} (${Math.round(crisis.confidence * 100)}%)`;
+        document.getElementById('liveCrisisSev').textContent = crisis.severity;
+        document.getElementById('liveCrisisDesc').textContent = crisis.description;
+        const badge = document.getElementById('liveSeverityBadge');
+        badge.textContent = crisis.severity.toUpperCase();
+        badge.className = 'badge ' + crisis.severity;
+      } else {
+        banner.className = 'result-banner clear';
+        document.getElementById('bannerIcon').textContent = '✅';
+        document.getElementById('bannerTitle').textContent = 'No crisis detected';
+        document.getElementById('bannerSub').textContent = data.outcome_summary || 'All signals analysed. Situation normal.';
+        document.getElementById('crisisInline').style.display = 'none';
+      }
+
+      // Stats
+      document.getElementById('statCrises').textContent = totalCrises;
+      document.getElementById('statCrises').className = 'stat-val' + (totalCrises > 0 ? ' red' : ' teal');
+      document.getElementById('statStatus').textContent = crisis ? 'ALERT' : 'CLEAR';
+      document.getElementById('statStatus').className = 'stat-val ' + (crisis ? 'red' : 'teal');
+    }
+
+    async function triggerScan() {
+      const btn = document.getElementById('scanBtn');
+      const icon = document.getElementById('scanBtnIcon');
+      btn.disabled = true;
+      icon.innerHTML = '<span class="spinner"></span>';
+      setStatus('Scanning live sources…', true);
+      document.getElementById('statStatus').textContent = 'SCANNING';
+      document.getElementById('statStatus').className = 'stat-val';
+
+      try {
+        const res = await fetch(`${API}/api/ciro/scan/live/sync`, { method: 'POST' });
+        const json = await res.json();
+
+        if (json.status === 'success' && json.data) {
+          const data = json.data;
+          const signals = data.input_signals || [];
+          totalSignals += signals.length;
+          totalScans++;
+
+          renderSignals(signals);
+          renderResult(data);
+
+          document.getElementById('statSignals').textContent = totalSignals;
+          document.getElementById('lastScanTime').textContent = `Last scan: ${new Date().toLocaleTimeString()}`;
+          setStatus('Scan complete', false);
+        } else {
+          setStatus('Scan failed — ' + (json.message || 'unknown error'), false);
+          document.getElementById('statStatus').textContent = 'ERROR';
+        }
+      } catch (err) {
+        setStatus('Connection error', false);
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+        icon.textContent = '📡';
+      }
+    }
+
+    // Check if weather key is active
+    async function checkWeatherKey() {
+      try {
+        const r = await fetch('https://api.openweathermap.org/data/2.5/weather?q=Karachi&appid=1459315319a44e1ab1b257f346a3754f&units=metric');
+        const d = await r.json();
+        if (d.main) {
+          document.getElementById('wxDot').style.background = '#00e5c0';
+          document.getElementById('wxStatus').textContent = 'Active ✓';
+        }
+      } catch (_) {}
+    }
+    checkWeatherKey();
+
+    async function loadRecentLiveRuns() {
+      try {
+        const res = await fetch(`${API}/api/ciro/runs`);
+        const json = await res.json();
+        if (json.data && json.data.length > 0) {
+          // Update stats based on all runs
+          document.getElementById('statSignals').textContent = json.data.length * 8;
+          document.getElementById('lastScanTime').textContent = `Last scan: ${new Date(json.data[0].started_at).toLocaleTimeString()}`;
+          
+          // Fetch the full details of the most recent run to populate the feed
+          const fullRes = await fetch(`${API}/api/ciro/runs/${json.data[0].run_id}`);
+          const fullJson = await fullRes.json();
+          if (fullJson.data && fullJson.data.input_signals) {
+            renderSignals(fullJson.data.input_signals);
+            renderResult(fullJson.data);
+          }
+        }
+      } catch (_) {}
+    }
+    loadRecentLiveRuns();
+  </script>
+</body>
+</html>

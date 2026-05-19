@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sentinel",
+      "cwd": "/Users/bushraliaqat/Documents/urban-sentinel-main",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5173", "--host"],
+      "port": 5173
+    }
+  ]
+}

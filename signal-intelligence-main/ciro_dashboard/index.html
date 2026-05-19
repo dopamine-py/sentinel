@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CIRO — Crisis Intelligence & Response Orchestrator</title>
+  <meta name="description" content="AI-powered urban crisis detection, response planning, and simulation for Pakistani metropolitans." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <img src="logo.png" alt="CIRO Logo" style="height:48px; border-radius: 12px; box-shadow: 0 0 15px rgba(255,42,85,0.4);" />
+        <div class="logo-text" style="display:flex; flex-direction:column; justify-content:center; margin-left: 12px;">
+          <span class="logo-name" style="font-size: 1.4rem; letter-spacing: 1px;">CIRO</span>
+          <span class="logo-sub" style="font-size: 0.75rem;">Crisis Intelligence & Response Orchestrator</span>
+        </div>
+      </div>
+      <nav style="display:flex;gap:4px">
+        <a href="index.html" style="padding:6px 16px;border-radius:8px;font-size:13px;font-weight:500;color:#fff;background:rgba(255,59,92,0.15);border:1px solid rgba(255,59,92,0.3);text-decoration:none">Dashboard</a>
+        <a href="live.html" style="padding:6px 16px;border-radius:8px;font-size:13px;font-weight:500;color:#8b90a7;text-decoration:none;border:1px solid transparent">Live Feed</a>
+      </nav>
+      <div class="header-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <!-- Left: Control Panel -->
+    <aside class="sidebar">
+      <section class="card" id="inputCard">
+        <h2 class="card-title">🔍 Signal Input</h2>
+
+        <label class="field-label">Crisis Scenario</label>
+        <select id="scenarioSelect" class="select">
+          <option value="urban_flooding">🌊 Urban Flooding</option>
+          <option value="heatwave">🔥 Heatwave</option>
+          <option value="accident">🚗 Road Accident</option>
+          <option value="road_blockage">🚧 Road Blockage</option>
+          <option value="infrastructure_failure">⚡ Infrastructure Failure</option>
+        </select>
+
+        <label class="field-label" style="margin-top:16px">Custom Report / Social Post</label>
+        <textarea id="customSignal" class="textarea" rows="4" placeholder="e.g. G-10 mein pani bhar gaya hai, gaariyan phans gayi hain&#10;&#10;or: Flash flood at George Town for 30 mins..."></textarea>
+
+        <button class="btn-primary" id="runBtn" onclick="runPipeline()">
+          <span class="btn-icon">▶</span> Analyze Crisis
+        </button>
+
+        <div id="loadingBar" class="loading-bar" style="display:none">
+          <div class="loading-fill"></div>
+        </div>
+      </section>
+
+      <section class="card" id="runsCard">
+        <h2 class="card-title">📋 Recent Runs</h2>
+        <div id="runsList" class="runs-list">
+          <p class="empty-state">No runs yet. Start an analysis above.</p>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Right: Results -->
+    <div class="content">
+      <!-- Welcome / placeholder -->
+      <div id="welcomePanel" class="welcome-panel">
+        <div class="welcome-icon">🛰️</div>
+        <h1>Crisis Intelligence Ready</h1>
+        <p>Select a scenario or paste a social media report, then click <strong>Analyze Crisis</strong> to activate the multi-agent pipeline.</p>
+        <div class="feature-grid">
+          <div class="feature-item"><span>📡</span><span>Multi-source ingestion</span></div>
+          <div class="feature-item"><span>🧠</span><span>AI crisis detection</span></div>
+          <div class="feature-item"><span>📋</span><span>Action planning</span></div>
+          <div class="feature-item"><span>🎮</span><span>Response simulation</span></div>
+        </div>
+      </div>
+
+      <!-- Results panel (hidden until run) -->
+      <div id="resultsPanel" style="display:none">
+
+        <!-- Crisis Detection -->
+        <section class="card result-card" id="crisisCard">
+          <div class="result-header">
+            <h2 class="card-title">🚨 Detected Situation</h2>
+            <div id="severityBadge" class="badge"></div>
+          </div>
+          <div class="crisis-grid">
+            <div class="crisis-field">
+              <span class="field-label">Type</span>
+              <span class="field-value" id="crisisType">—</span>
+            </div>
+            <div class="crisis-field">
+              <span class="field-label">Location</span>
+              <span class="field-value" id="crisisLocation">—</span>
+            </div>
+            <div class="crisis-field">
+              <span class="field-label">Confidence</span>
+              <span class="field-value" id="crisisConfidence">—</span>
+            </div>
+            <div class="crisis-field">
+              <span class="field-label">Severity</span>
+              <span class="field-value" id="crisisSeverity">—</span>
+            </div>
+          </div>
+          <p class="crisis-description" id="crisisDesc"></p>
+
+          <!-- Confidence Bar -->
+          <div class="conf-bar-wrap">
+            <span class="field-label">Detection Confidence</span>
+            <div class="conf-bar-bg">
+              <div class="conf-bar-fill" id="confBar"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Crisis Map -->
+        <section class="card result-card" id="mapCard" style="display:none; padding:0; overflow:hidden;">
+          <h2 class="card-title" style="padding:20px 24px 0;">🗺️ Crisis & Rerouting Map</h2>
+          <div id="webMap" style="height: 400px; width: 100%; margin-top:16px;"></div>
+        </section>
+
+        <!-- Impact -->
+        <section class="card result-card" id="impactCard">
+          <h2 class="card-title">💥 Impact Assessment</h2>
+          <p id="impactSummary" class="impact-summary"></p>
+          <ul id="impactList" class="impact-list"></ul>
+          <div class="impact-meta-grid">
+            <div class="impact-meta"><span class="field-label">People Affected</span><span id="peopleAffected" class="meta-val"></span></div>
+            <div class="impact-meta"><span class="field-label">Time Sensitivity</span><span id="timeSensitivity" class="meta-val"></span></div>
+            <div class="impact-meta"><span class="field-label">Infrastructure Risk</span><span id="infraRisk" class="meta-val"></span></div>
+          </div>
+        </section>
+
+        <!-- Actions -->
+        <section class="card result-card" id="actionsCard">
+          <h2 class="card-title">📋 Recommended Actions</h2>
+          <p id="coordNote" class="coord-note"></p>
+          <div id="actionsList" class="actions-list"></div>
+        </section>
+
+        <!-- Before / After Simulation -->
+        <section class="card result-card" id="simCard">
+          <h2 class="card-title">🎮 Simulated Execution</h2>
+          <div class="before-after">
+            <div class="state-box before">
+              <h3>Before Response</h3>
+              <div id="beforeState" class="state-content"></div>
+            </div>
+            <div class="arrow">→</div>
+            <div class="state-box after">
+              <h3>After Response</h3>
+              <div id="afterState" class="state-content"></div>
+            </div>
+          </div>
+          <div id="simResults" class="sim-results"></div>
+        </section>
+
+        <!-- Outcome -->
+        <section class="card result-card" id="outcomeCard">
+          <h2 class="card-title">✅ Outcome</h2>
+          <p id="outcomeSummary" class="outcome-text"></p>
+        </section>
+
+        <!-- Agent Trace -->
+        <section class="card result-card" id="traceCard">
+          <h2 class="card-title">🤖 Agent Trace / Reasoning Log</h2>
+          <div id="traceList" class="trace-list"></div>
+        </section>
+
+      </div><!-- /resultsPanel -->
+    </div><!-- /content -->
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

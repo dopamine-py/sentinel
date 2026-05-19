@@ -1,0 +1,418 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+@import "tailwindcss" source(none);
+@import "tw-animate-css";
+@source "../src";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
+  --color-accent-cyan: var(--accent-cyan);
+  --color-accent-cyan-soft: var(--accent-cyan-soft);
+  --color-status-ok: var(--status-ok);
+  --color-status-warn: var(--status-warn);
+  --color-status-alert: var(--status-alert);
+  --color-status-critical: var(--status-critical);
+
+  /* Legacy aliases — keep so transitional references don't crash */
+  --color-cyan: var(--accent-cyan);
+  --color-cyan-soft: var(--accent-cyan-soft);
+  --color-electric: var(--accent-cyan-soft);
+  --color-amber: var(--status-warn);
+  --color-crimson: var(--status-critical);
+  --color-violet: var(--accent-cyan-soft);
+  --color-emerald: var(--status-ok);
+  --color-rose: var(--status-critical);
+  --color-bg0: var(--surface-0);
+  --color-bg1: var(--surface-1);
+  --color-bg2: var(--surface-2);
+  --color-bg3: var(--surface-3);
+  --color-bg4: var(--surface-3);
+  --color-glass-border: var(--line);
+  --color-hud-line: var(--line-strong);
+  --color-crisis-red: var(--status-critical);
+  --color-crisis-orange: var(--status-warn);
+  --color-crisis-teal: var(--accent-cyan);
+  --color-crisis-purple: var(--accent-cyan-soft);
+  --color-crisis-blue: var(--accent-cyan-soft);
+  --color-crisis-yellow: var(--status-warn);
+  --color-crisis-green: var(--status-ok);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --animate-fade-in: fadeIn 0.32s ease-out both;
+  --animate-rise: rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pulse-soft: pulseSoft 2.4s ease-in-out infinite;
+  --animate-data-flow: dataFlow 2.2s linear infinite;
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulseSoft {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+  }
+  @keyframes dataFlow {
+    from { stroke-dashoffset: 80; }
+    to   { stroke-dashoffset: 0; }
+  }
+}
+
+/* ============================================================
+   PALETTE — graphite + a single restrained cyan accent
+   Inspired by Linear / Vercel / Anduril
+   ============================================================ */
+:root {
+  --radius: 10px;
+
+  /* True graphite surfaces, near-black with a hint of cool */
+  --surface-0: #0a0b0d;   /* page background */
+  --surface-1: #0e1014;   /* default card */
+  --surface-2: #131519;   /* raised card */
+  --surface-3: #1a1d22;   /* input / hover */
+
+  --line: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.10);
+
+  --text-primary: #e8e9eb;
+  --text-secondary: #9a9ea5;
+  --text-tertiary: #6b6f76;
+
+  /* Single accent — used sparingly */
+  --accent-cyan: #67e8f9;
+  --accent-cyan-soft: rgba(103, 232, 249, 0.14);
+
+  /* Operational status — tactical, not decorative */
+  --status-ok: #34d399;        /* tactical green */
+  --status-warn: #f59e0b;      /* amber */
+  --status-alert: #fb7185;     /* rose */
+  --status-critical: #ef4444;  /* hard red */
+
+  --background: var(--surface-0);
+  --foreground: var(--text-primary);
+
+  --card: var(--surface-1);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-2);
+  --popover-foreground: var(--text-primary);
+
+  --primary: var(--text-primary);
+  --primary-foreground: var(--surface-0);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--status-critical);
+  --destructive-foreground: #fff;
+
+  --border: var(--line);
+  --input: var(--surface-3);
+  --ring: var(--accent-cyan);
+}
+
+.dark {
+  --background: var(--surface-0);
+  --foreground: var(--text-primary);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+
+  html, body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Editorial type rhythm */
+  h1, h2, h3, h4 { letter-spacing: -0.02em; }
+  h1 { letter-spacing: -0.032em; }
+
+  ::selection {
+    background-color: rgba(103, 232, 249, 0.22);
+    color: var(--foreground);
+  }
+
+  /* Restrained scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.10);
+  }
+}
+
+@layer utilities {
+  .font-mono { font-family: var(--font-mono); }
+  .font-display { font-family: var(--font-display); letter-spacing: -0.025em; }
+
+  /* Text colors */
+  .text-primary-soft { color: var(--text-secondary); }
+  .text-tertiary { color: var(--text-tertiary); }
+
+  /* SURFACES — flat by default. No drama. */
+  .surface {
+    background: var(--surface-1);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .surface-raised {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .surface-input {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+  }
+  .surface-input:focus,
+  .surface-input:focus-within {
+    border-color: rgba(103, 232, 249, 0.32);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(103, 232, 249, 0.08);
+  }
+
+  /* DIVIDERS */
+  .divider-y { border-bottom: 1px solid var(--line); }
+  .divider-x { border-right: 1px solid var(--line); }
+
+  /* LABEL — small, mono, secondary */
+  .label-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+  .kbd {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--text-secondary);
+  }
+
+  /* BUTTONS — quiet, intentional */
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 8px;
+    background: var(--text-primary);
+    color: var(--surface-0);
+    font-weight: 500; font-size: 13.5px;
+    border: 1px solid var(--text-primary);
+    transition: background 160ms ease, transform 120ms ease;
+  }
+  .btn-primary:hover { background: #fff; }
+  .btn-primary:active { transform: translateY(0.5px); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    font-weight: 500; font-size: 13.5px;
+    border: 1px solid var(--line);
+    transition: background 160ms ease, border-color 160ms ease;
+  }
+  .btn-ghost:hover { background: var(--surface-2); border-color: var(--line-strong); }
+
+  .btn-accent {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 8px;
+    background: var(--accent-cyan);
+    color: #001318;
+    font-weight: 600; font-size: 13.5px;
+    border: 1px solid var(--accent-cyan);
+    transition: filter 160ms ease, transform 120ms ease;
+  }
+  .btn-accent:hover { filter: brightness(1.06); }
+
+  /* SUBTLE BACKGROUND — used ONLY in hero/landing, never globally */
+  .hero-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 25%, transparent 85%);
+  }
+  .hero-glow {
+    background: radial-gradient(
+      ellipse 60% 50% at 50% 0%,
+      rgba(103, 232, 249, 0.06),
+      transparent 65%
+    );
+  }
+
+  /* TICKER MASK */
+  .ticker-mask {
+    mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  }
+
+  /* DOT INDICATOR */
+  .dot-ok       { background: var(--status-ok); }
+  .dot-warn     { background: var(--status-warn); }
+  .dot-alert    { background: var(--status-alert); }
+  .dot-critical { background: var(--status-critical); }
+  .dot-cyan     { background: var(--accent-cyan); }
+
+  .dot-pulse {
+    position: relative;
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 999px;
+  }
+  .dot-pulse::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    opacity: 0.35;
+    animation: pulseSoft 2.4s ease-in-out infinite;
+  }
+
+  /* SEVERITY PILLS — tactical labels, no glow */
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1.4;
+    border: 1px solid;
+  }
+  .pill-critical { color: #fda4af; background: rgba(239, 68, 68, 0.08);  border-color: rgba(239, 68, 68, 0.22); }
+  .pill-high     { color: #fbbf24; background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.22); }
+  .pill-medium   { color: #fde68a; background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.16); }
+  .pill-low      { color: #6ee7b7; background: rgba(52, 211, 153, 0.06); border-color: rgba(52, 211, 153, 0.20); }
+  .pill-ok       { color: #67e8f9; background: rgba(103, 232, 249, 0.06); border-color: rgba(103, 232, 249, 0.20); }
+  .pill-muted    { color: var(--text-tertiary); background: var(--surface-2); border-color: var(--line); }
+
+  /* DATA LINES (svg) — used only inside orchestration diagrams */
+  .data-line {
+    stroke-dasharray: 4 6;
+    animation: dataFlow 2.2s linear infinite;
+  }
+
+  /* CONFIDENCE BAR — single thin line */
+  .confidence-track {
+    height: 3px;
+    background: var(--surface-3);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .confidence-fill {
+    height: 100%;
+    background: var(--accent-cyan);
+    transition: width 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* TABLE — Linear-style */
+  .row-hover { transition: background 120ms ease; }
+  .row-hover:hover { background: rgba(255, 255, 255, 0.025); }
+
+  /* RADAR — minimal, single ring */
+  .radar-ring {
+    background:
+      radial-gradient(circle at center, transparent 0, transparent 38%, rgba(103, 232, 249, 0.12) 38.4%, transparent 39%),
+      radial-gradient(circle at center, transparent 0, transparent 64%, rgba(103, 232, 249, 0.08) 64.4%, transparent 65%),
+      radial-gradient(circle at center, transparent 0, transparent 92%, rgba(103, 232, 249, 0.05) 92.4%, transparent 93%);
+  }
+  .radar-sweep {
+    background: conic-gradient(
+      from 0deg,
+      rgba(103, 232, 249, 0.30) 0deg,
+      rgba(103, 232, 249, 0) 40deg,
+      rgba(103, 232, 249, 0) 360deg
+    );
+    animation: radarSweep 6s linear infinite;
+  }
+  @keyframes radarSweep {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* MICRO LOADER */
+  .progress-track {
+    height: 2px;
+    background: var(--surface-3);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress-indeterminate {
+    height: 100%;
+    width: 32%;
+    background: var(--accent-cyan);
+    border-radius: 999px;
+    animation: loaderSweep 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  @keyframes loaderSweep {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(360%); }
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .data-line, .radar-sweep, .progress-indeterminate, .dot-pulse::after {
+      animation: none;
+    }
+  }
+}

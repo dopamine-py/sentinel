@@ -1,0 +1,55 @@
+# ── Sentinel monorepo — root ignore (defense-in-depth on top of per-project) ──
+
+# Secrets — NEVER commit
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+*.key
+*.pem
+*.p8
+*.p12
+*.jks
+.dev.vars
+
+# Dependencies
+**/node_modules/
+
+# Builds / outputs
+**/dist/
+**/dist-ssr/
+**/.output/
+**/.wrangler/
+**/.vinxi/
+**/.tanstack/
+**/web-build/
+**/build/
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/venv/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Expo / RN
+**/.expo/
+**/expo-env.d.ts
+**/.metro-health-check*
+**/ios/
+**/android/
+
+# Neutralized nested git history (kept locally, not tracked)
+**/.git.bak/
+
+# OS / editor / logs
+.DS_Store
+**/.DS_Store
+*.log
+**/*.log
+.vscode/
+.idea/
+*.tsbuildinfo
