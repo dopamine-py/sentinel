@@ -9,6 +9,6 @@
   // FastAPI URL (e.g. https://sentinel-backend.onrender.com) then redeploy to
   // light up live "Scan everything" on the public site.
   "vars": {
-    "SENTINEL_API_URL": ""
+    "SENTINEL_API_URL": "https://sentinel-backend-cupp.onrender.com"
   }
 }
