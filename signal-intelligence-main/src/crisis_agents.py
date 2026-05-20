@@ -323,23 +323,30 @@ Also available: {len(raw_signals)} raw signals including weather and traffic dat
         result, llm_err = _safe_llm(DETECTION_SYSTEM, user_prompt, max_tokens=1500)
         used_kw_fallback = False
 
-        if not result.get("crisis_detected", False):
-            # ── Deterministic fallback: keyword-based classification ──────────
+        # Only fall back to the keyword matcher when the LLM actually
+        # failed. If the LLM ran successfully and judged "no crisis",
+        # respect that — overriding a working LLM with a regex-on-text
+        # detector is what was producing false `[LLM unavailable]` tags
+        # on legitimate "insufficient evidence" calls.
+        if llm_err and not result.get("crisis_detected", False):
             result = _keyword_detect(parsed_signals, raw_signals)
             used_kw_fallback = True
 
         if not result.get("crisis_detected", False):
+            if llm_err:
+                reasoning = f"{_LLM_FALLBACK_TAG} {llm_err}. Keyword fallback also found no crisis pattern."
+                tools = [_tool_call(False, "DETECTION_SYSTEM", llm_err), {"tool": "_keyword_detect", "status": "no_match"}]
+            else:
+                # Honest "the model looked and decided no" — not a fallback.
+                reasoning = result.get("reasoning") or "LLM judged the signals insufficient for a crisis call."
+                tools = [_tool_call(True, "DETECTION_SYSTEM")]
             traces.append(AgentTrace(
                 agent_name=self.name,
                 step=2,
                 input_summary=f"{len(parsed_signals)} parsed signals",
-                reasoning=(
-                    f"{_LLM_FALLBACK_TAG} {llm_err}. Keyword fallback also found no crisis pattern."
-                    if llm_err
-                    else "No crisis pattern detected by LLM or keyword analysis"
-                ),
+                reasoning=reasoning,
                 output_summary="No crisis detected",
-                tool_calls=[_tool_call(llm_err is None, "DETECTION_SYSTEM", llm_err), {"tool": "_keyword_detect", "status": "no_match"}],
+                tool_calls=tools,
                 duration_ms=int((time.time() - t0) * 1000),
                 timestamp=_now_iso(),
             ))
