@@ -72,7 +72,16 @@ def _safe_llm(system: str, user: str, max_tokens: int = 512, retries: int = 1) -
                 temperature=0.1,
                 max_output_tokens=max_tokens,
             )
-            return json.loads(raw), None
+            # Some models still emit markdown fences (```json …```) even
+            # when asked for application/json — strip them defensively so
+            # one stray fence doesn't trigger the whole fallback path.
+            text = raw.strip()
+            if text.startswith("```"):
+                text = text.strip("`")
+                if text.lower().startswith("json"):
+                    text = text[4:]
+                text = text.strip()
+            return json.loads(text), None
         except Exception as exc:
             msg = str(exc)
             last_err = msg.splitlines()[0][:200] if msg else exc.__class__.__name__
@@ -133,7 +142,7 @@ Translate any Urdu text to English in the 'normalized_text' field.
 Signals:
 {signal_text}"""
 
-        result, llm_err = _safe_llm(INGESTION_SYSTEM, user_prompt, max_tokens=800)
+        result, llm_err = _safe_llm(INGESTION_SYSTEM, user_prompt, max_tokens=2048)
         parsed = result.get("parsed_signals", [])
         locations = result.get("locations_mentioned", [])
 
@@ -292,7 +301,7 @@ class CrisisDetectionAgent:
 
 Also available: {len(raw_signals)} raw signals including weather and traffic data."""
 
-        result, llm_err = _safe_llm(DETECTION_SYSTEM, user_prompt, max_tokens=600)
+        result, llm_err = _safe_llm(DETECTION_SYSTEM, user_prompt, max_tokens=1500)
         used_kw_fallback = False
 
         if not result.get("crisis_detected", False):
@@ -391,7 +400,7 @@ Supporting signals:
 
 Provide a detailed situation analysis and impact assessment."""
 
-        result, llm_err = _safe_llm(SITUATION_SYSTEM, user_prompt, max_tokens=600)
+        result, llm_err = _safe_llm(SITUATION_SYSTEM, user_prompt, max_tokens=1500)
         used_fallback = llm_err is not None or not result
 
         if used_fallback:
@@ -514,7 +523,7 @@ class ActionPlanningAgent:
 
 Generate a coordinated emergency response action plan."""
 
-        result, llm_err = _safe_llm(ACTION_SYSTEM, user_prompt, max_tokens=700)
+        result, llm_err = _safe_llm(ACTION_SYSTEM, user_prompt, max_tokens=2048)
 
         raw_actions = result.get("actions", [])
         used_fallback = bool(llm_err) or not raw_actions
@@ -803,7 +812,7 @@ Actions Executed:
 
 Evaluate the response effectiveness."""
 
-        result, llm_err = _safe_llm(OUTCOME_SYSTEM, user_prompt, max_tokens=500)
+        result, llm_err = _safe_llm(OUTCOME_SYSTEM, user_prompt, max_tokens=1500)
         used_fallback = llm_err is not None
 
         # The fallback summary below is honest — it's built from real
