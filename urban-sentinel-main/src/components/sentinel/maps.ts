@@ -174,3 +174,40 @@ export function loadLeaflet(): Promise<any> {
 
   return leafletPromise.then((w) => w.L);
 }
+
+/* ============================================================
+   Google Maps JS API loader — opt-in via VITE_GOOGLE_MAPS_API_KEY.
+   The key MUST be HTTP-referrer-restricted in Google Cloud Console;
+   any JS API key shipped to the browser is by design publicly visible.
+   ============================================================ */
+let googlePromise: Promise<any> | null = null;
+
+export function loadGoogleMaps(apiKey: string): Promise<any> {
+  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
+  const w = window as any;
+  if (w.google?.maps) return Promise.resolve(w.google.maps);
+  if (googlePromise) return googlePromise;
+  if (!apiKey) return Promise.reject(new Error("missing VITE_GOOGLE_MAPS_API_KEY"));
+
+  googlePromise = new Promise((resolve, reject) => {
+    const cbName = `__sentinelGmapsCb_${Math.random().toString(36).slice(2)}`;
+    (window as any)[cbName] = () => {
+      delete (window as any)[cbName];
+      resolve((window as any).google.maps);
+    };
+    const script = document.createElement("script");
+    const params = new URLSearchParams({
+      key: apiKey,
+      v: "weekly",
+      libraries: "geometry",
+      callback: cbName,
+      loading: "async",
+    });
+    script.src = `https://maps.googleapis.com/maps/api/js?${params}`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = () => reject(new Error("Failed to load Google Maps JS API"));
+    document.head.appendChild(script);
+  });
+  return googlePromise;
+}
