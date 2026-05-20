@@ -4,6 +4,12 @@ uvicorn[standard]>=0.24.0
 python-dotenv>=1.0.0
 requests>=2.31.0
 
+# LLM provider — Google Gemini (new google-genai SDK).
+# Without this pinned, the Gemini call in llm_client.py raises
+# ModuleNotFoundError on Render, every agent silently falls back to
+# templated text, and the UI ends up looking like seeded demo data.
+google-genai>=0.3.0,<2.0.0
+
 # Data ingestion
 feedparser>=6.0.0
 beautifulsoup4>=4.12.0

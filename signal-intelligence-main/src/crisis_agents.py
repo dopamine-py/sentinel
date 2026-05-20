@@ -55,9 +55,15 @@ def _signals_to_text(signals: list[CrisisSignal]) -> str:
     return "\n".join(lines)
 
 
-def _safe_llm(system: str, user: str, max_tokens: int = 512, retries: int = 1) -> dict:
-    """Call LLM with retry + backoff for 429s. Always returns a dict."""
+def _safe_llm(system: str, user: str, max_tokens: int = 512, retries: int = 1) -> tuple[dict, str | None]:
+    """Call LLM with retry + backoff for 429s.
+
+    Returns (result, error). On success: (parsed_dict, None). On failure:
+    ({}, "short error reason") — callers MUST check the error and surface
+    the fallback path honestly instead of pretending the LLM reasoned.
+    """
     import time as _time
+    last_err = "unknown error"
     for attempt in range(retries + 1):
         try:
             raw = generate_json_completion(
@@ -66,9 +72,10 @@ def _safe_llm(system: str, user: str, max_tokens: int = 512, retries: int = 1) -
                 temperature=0.1,
                 max_output_tokens=max_tokens,
             )
-            return json.loads(raw)
+            return json.loads(raw), None
         except Exception as exc:
             msg = str(exc)
+            last_err = msg.splitlines()[0][:200] if msg else exc.__class__.__name__
             is_rate_limit = "429" in msg or "quota" in msg.lower() or "rate" in msg.lower()
             wait = 5 if is_rate_limit else 2
             logger.warning("LLM attempt %d failed (%s). %s",
@@ -76,7 +83,17 @@ def _safe_llm(system: str, user: str, max_tokens: int = 512, retries: int = 1) -
                            f"Retrying in {wait}s..." if attempt < retries else "Using fallback.")
             if attempt < retries:
                 _time.sleep(wait)
-    return {}
+    return {}, last_err
+
+
+def _tool_call(success: bool, prompt_label: str, error: str | None = None) -> dict:
+    """Build an honest trace tool_calls entry — fail state isn't hidden."""
+    if success:
+        return {"tool": "generate_json_completion", "prompt": prompt_label, "status": "ok"}
+    return {"tool": "generate_json_completion", "prompt": prompt_label, "status": "failed", "error": error or "LLM unavailable"}
+
+
+_LLM_FALLBACK_TAG = "[fallback · LLM unavailable]"
 
 
 # ---------------------------------------------------------------------------
@@ -116,11 +133,14 @@ Translate any Urdu text to English in the 'normalized_text' field.
 Signals:
 {signal_text}"""
 
-        result = _safe_llm(INGESTION_SYSTEM, user_prompt, max_tokens=800)
+        result, llm_err = _safe_llm(INGESTION_SYSTEM, user_prompt, max_tokens=800)
         parsed = result.get("parsed_signals", [])
         locations = result.get("locations_mentioned", [])
 
-        # Fallback: if LLM fails, create basic parsed output
+        # Fallback: pass through each signal with no transformation. Honest
+        # because it's a deterministic identity map of what came in, not
+        # invented analysis.
+        used_fallback = llm_err is not None or not parsed
         if not parsed:
             parsed = [
                 {
@@ -136,13 +156,24 @@ Signals:
             ]
             locations = list({s.location for s in signals})
 
+        reasoning = (
+            f"{_LLM_FALLBACK_TAG} {llm_err or 'no parse'} — passed signals through unchanged."
+            if used_fallback
+            else "Normalized multilingual signals; extracted locations and urgency levels."
+        )
+        output_summary = (
+            f"{_LLM_FALLBACK_TAG} {len(parsed)} signals passed through; locations: {locations}"
+            if used_fallback
+            else f"Parsed {len(parsed)} signals; locations: {locations}"
+        )
+
         traces.append(AgentTrace(
             agent_name=self.name,
             step=1,
             input_summary=f"{len(signals)} raw signals from {len({s.source for s in signals})} source types",
-            reasoning="Normalized multilingual signals; extracted locations and urgency levels",
-            output_summary=f"Parsed {len(parsed)} signals; locations: {locations}",
-            tool_calls=[{"tool": "generate_json_completion", "prompt": "INGESTION_SYSTEM"}],
+            reasoning=reasoning,
+            output_summary=output_summary,
+            tool_calls=[_tool_call(not used_fallback, "INGESTION_SYSTEM", llm_err)],
             duration_ms=int((time.time() - t0) * 1000),
             timestamp=_now_iso(),
         ))
@@ -261,20 +292,26 @@ class CrisisDetectionAgent:
 
 Also available: {len(raw_signals)} raw signals including weather and traffic data."""
 
-        result = _safe_llm(DETECTION_SYSTEM, user_prompt, max_tokens=600)
+        result, llm_err = _safe_llm(DETECTION_SYSTEM, user_prompt, max_tokens=600)
+        used_kw_fallback = False
 
         if not result.get("crisis_detected", False):
             # ── Deterministic fallback: keyword-based classification ──────────
             result = _keyword_detect(parsed_signals, raw_signals)
+            used_kw_fallback = True
 
         if not result.get("crisis_detected", False):
             traces.append(AgentTrace(
                 agent_name=self.name,
                 step=2,
                 input_summary=f"{len(parsed_signals)} parsed signals",
-                reasoning="No crisis pattern detected by LLM or keyword analysis",
+                reasoning=(
+                    f"{_LLM_FALLBACK_TAG} {llm_err}. Keyword fallback also found no crisis pattern."
+                    if llm_err
+                    else "No crisis pattern detected by LLM or keyword analysis"
+                ),
                 output_summary="No crisis detected",
-                tool_calls=[{"tool": "generate_json_completion", "prompt": "DETECTION_SYSTEM"}, {"tool": "_keyword_detect"}],
+                tool_calls=[_tool_call(llm_err is None, "DETECTION_SYSTEM", llm_err), {"tool": "_keyword_detect", "status": "no_match"}],
                 duration_ms=int((time.time() - t0) * 1000),
                 timestamp=_now_iso(),
             ))
@@ -301,8 +338,16 @@ Also available: {len(raw_signals)} raw signals including weather and traffic dat
             step=2,
             input_summary=f"{len(parsed_signals)} parsed signals",
             reasoning=crisis.reasoning,
-            output_summary=f"Detected: {crisis.crisis_type.value} at {crisis.location} | confidence={crisis.confidence:.0%} | severity={crisis.severity.value}",
-            tool_calls=[{"tool": "generate_json_completion", "prompt": "DETECTION_SYSTEM"}],
+            output_summary=(
+                f"{_LLM_FALLBACK_TAG} Detected by keyword fallback: {crisis.crisis_type.value} at {crisis.location} | confidence={crisis.confidence:.0%} | severity={crisis.severity.value}"
+                if used_kw_fallback
+                else f"Detected: {crisis.crisis_type.value} at {crisis.location} | confidence={crisis.confidence:.0%} | severity={crisis.severity.value}"
+            ),
+            tool_calls=(
+                [_tool_call(False, "DETECTION_SYSTEM", llm_err), {"tool": "_keyword_detect", "status": "ok"}]
+                if used_kw_fallback
+                else [_tool_call(True, "DETECTION_SYSTEM")]
+            ),
             duration_ms=int((time.time() - t0) * 1000),
             timestamp=_now_iso(),
         ))
@@ -346,25 +391,43 @@ Supporting signals:
 
 Provide a detailed situation analysis and impact assessment."""
 
-        result = _safe_llm(SITUATION_SYSTEM, user_prompt, max_tokens=600)
+        result, llm_err = _safe_llm(SITUATION_SYSTEM, user_prompt, max_tokens=600)
+        used_fallback = llm_err is not None or not result
 
-        report = SituationReport(
-            crisis=crisis,
-            impact_summary=result.get("impact_summary", "Significant urban disruption detected."),
-            impacts=result.get("impacts", ["Traffic disruption", "Public safety risk"]),
-            people_affected_estimate=result.get("people_affected_estimate", "Unknown"),
-            infrastructure_risk=result.get("infrastructure_risk", "Roads and utilities at risk"),
-            time_sensitivity=result.get("time_sensitivity", "immediate"),
-            reasoning=result.get("reasoning", ""),
-        )
+        if used_fallback:
+            # Honest fallback — no fabricated impact text. The UI/trace will
+            # show the fallback tag so it's clear this isn't model reasoning.
+            report = SituationReport(
+                crisis=crisis,
+                impact_summary=f"{_LLM_FALLBACK_TAG} No situation analysis available.",
+                impacts=[],
+                people_affected_estimate="—",
+                infrastructure_risk="—",
+                time_sensitivity="unknown",
+                reasoning=f"LLM call failed: {llm_err or 'no result'}. No analyst reasoning produced.",
+            )
+        else:
+            report = SituationReport(
+                crisis=crisis,
+                impact_summary=result.get("impact_summary", ""),
+                impacts=result.get("impacts", []),
+                people_affected_estimate=result.get("people_affected_estimate", "Unknown"),
+                infrastructure_risk=result.get("infrastructure_risk", ""),
+                time_sensitivity=result.get("time_sensitivity", "immediate"),
+                reasoning=result.get("reasoning", ""),
+            )
 
         traces.append(AgentTrace(
             agent_name=self.name,
             step=3,
             input_summary=f"Crisis: {crisis.crisis_type.value} at {crisis.location}",
             reasoning=report.reasoning,
-            output_summary=f"Impact: {report.impact_summary[:100]}... | Sensitivity: {report.time_sensitivity}",
-            tool_calls=[{"tool": "generate_json_completion", "prompt": "SITUATION_SYSTEM"}],
+            output_summary=(
+                f"{_LLM_FALLBACK_TAG} situation analysis skipped — {llm_err or 'no result'}"
+                if used_fallback
+                else f"Impact: {report.impact_summary[:100]}... | Sensitivity: {report.time_sensitivity}"
+            ),
+            tool_calls=[_tool_call(not used_fallback, "SITUATION_SYSTEM", llm_err)],
             duration_ms=int((time.time() - t0) * 1000),
             timestamp=_now_iso(),
         ))
@@ -429,7 +492,8 @@ _DEFAULT_ACTIONS: dict[str, list[dict]] = {
 
 
 def _default_actions(crisis_type: str, location: str) -> list[dict]:
-    actions = _DEFAULT_ACTIONS.get(crisis_type, _DEFAULT_ACTIONS["road_blockage"])
+    import copy
+    actions = copy.deepcopy(_DEFAULT_ACTIONS.get(crisis_type, _DEFAULT_ACTIONS["road_blockage"]))
     for a in actions:
         if "Affected" in a["target_area"]:
             a["target_area"] = a["target_area"].replace("Affected Route", location).replace("Affected Sectors", location).replace("Affected Site", location)
@@ -450,18 +514,25 @@ class ActionPlanningAgent:
 
 Generate a coordinated emergency response action plan."""
 
-        result = _safe_llm(ACTION_SYSTEM, user_prompt, max_tokens=700)
+        result, llm_err = _safe_llm(ACTION_SYSTEM, user_prompt, max_tokens=700)
 
         raw_actions = result.get("actions", [])
-        # ── Fallback: predefined actions per crisis type ──────────────────
+        used_fallback = bool(llm_err) or not raw_actions
+        # ── Deterministic fallback: predefined actions per crisis type.
+        # Kept for graceful demo robustness, but each description is tagged
+        # with [fallback] so the UI/trace makes it obvious that this is a
+        # template — not LLM-generated planning.
         if not raw_actions:
             raw_actions = _default_actions(situation.crisis.crisis_type.value, situation.crisis.location)
         actions = []
         for i, a in enumerate(raw_actions):
+            desc = a.get("description", "")
+            if used_fallback and desc and not desc.startswith(_LLM_FALLBACK_TAG):
+                desc = f"{_LLM_FALLBACK_TAG} {desc}"
             actions.append(ResponseAction(
                 action_id=f"ACT-{uuid.uuid4().hex[:6].upper()}",
                 action_type=a.get("action_type", "alert"),
-                description=a.get("description", ""),
+                description=desc,
                 priority=int(a.get("priority", i + 1)),
                 target_area=a.get("target_area", situation.crisis.location),
                 assigned_to=a.get("assigned_to", "Emergency Services"),
@@ -475,8 +546,16 @@ Generate a coordinated emergency response action plan."""
             plan_id=f"PLAN-{uuid.uuid4().hex[:8].upper()}",
             situation=situation,
             actions=actions,
-            coordination_note=result.get("coordination_note", ""),
-            reasoning=result.get("reasoning", ""),
+            coordination_note=(
+                f"{_LLM_FALLBACK_TAG} LLM unavailable ({llm_err or 'no result'}) — actions below are deterministic templates for this crisis type, not model-generated planning."
+                if used_fallback
+                else result.get("coordination_note", "")
+            ),
+            reasoning=(
+                f"LLM call failed: {llm_err or 'no result'}. Returned predefined template actions for {situation.crisis.crisis_type.value}."
+                if used_fallback
+                else result.get("reasoning", "")
+            ),
         )
 
         traces.append(AgentTrace(
@@ -484,8 +563,12 @@ Generate a coordinated emergency response action plan."""
             step=4,
             input_summary=f"Situation: {situation.crisis.crisis_type.value}, sensitivity={situation.time_sensitivity}",
             reasoning=plan.reasoning,
-            output_summary=f"Plan {plan.plan_id}: {len(actions)} actions | Top: {actions[0].description[:80] if actions else 'None'}",
-            tool_calls=[{"tool": "generate_json_completion", "prompt": "ACTION_SYSTEM"}],
+            output_summary=(
+                f"{_LLM_FALLBACK_TAG} Plan {plan.plan_id}: {len(actions)} template actions"
+                if used_fallback
+                else f"Plan {plan.plan_id}: {len(actions)} actions | Top: {actions[0].description[:80] if actions else 'None'}"
+            ),
+            tool_calls=[_tool_call(not used_fallback, "ACTION_SYSTEM", llm_err)],
             duration_ms=int((time.time() - t0) * 1000),
             timestamp=_now_iso(),
         ))
@@ -720,23 +803,34 @@ Actions Executed:
 
 Evaluate the response effectiveness."""
 
-        result = _safe_llm(OUTCOME_SYSTEM, user_prompt, max_tokens=500)
+        result, llm_err = _safe_llm(OUTCOME_SYSTEM, user_prompt, max_tokens=500)
+        used_fallback = llm_err is not None
 
-        summary = result.get("outcome_summary", (
+        # The fallback summary below is honest — it's built from real
+        # before/after numbers from the simulation, not invented text.
+        # Still tag it so the UI signals that no LLM evaluation occurred.
+        derived_summary = (
             f"Response to {plan.situation.crisis.crisis_type.value} initiated. "
             f"Traffic congestion reduced from {before.get('traffic_congestion_index', '?')} "
             f"to {after.get('traffic_congestion_index', '?'):.1f}. "
             f"{after.get('emergency_units_deployed', 0)} emergency units deployed. "
             f"{after.get('alerts_sent', 0):,} residents notified."
-        ))
+        )
+        summary = result.get("outcome_summary", derived_summary)
+        if used_fallback:
+            summary = f"{_LLM_FALLBACK_TAG} {derived_summary}"
 
         traces.append(AgentTrace(
             agent_name=self.name,
             step=6,
             input_summary=f"{len(results)} simulation results; before/after state comparison",
-            reasoning=result.get("reasoning", "Compared before/after state metrics to assess response impact"),
+            reasoning=(
+                f"LLM call failed: {llm_err}. Summary below is derived from simulation state, not model-evaluated."
+                if used_fallback
+                else result.get("reasoning", "Compared before/after state metrics to assess response impact")
+            ),
             output_summary=summary[:150],
-            tool_calls=[{"tool": "generate_json_completion", "prompt": "OUTCOME_SYSTEM"}],
+            tool_calls=[_tool_call(not used_fallback, "OUTCOME_SYSTEM", llm_err)],
             duration_ms=int((time.time() - t0) * 1000),
             timestamp=_now_iso(),
         ))

@@ -214,7 +214,7 @@ def run_crisis_pipeline(
             run_id=run_id,
             started_at=started_at,
             completed_at=datetime.now().isoformat(),
-            input_signals=raw_signals if "raw_signals" in dir() else [],
+            input_signals=raw_signals if "raw_signals" in locals() else [],
             detected_crisis=None,
             situation_report=None,
             action_plan=None,
