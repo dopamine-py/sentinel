@@ -466,8 +466,40 @@
   .font-mono { overflow-wrap: anywhere; word-break: break-word; }
 
   /* Cap the very largest display headlines so multi-word titles
-     don't blow past the screen edge on small phones */
-  .font-display { letter-spacing: -0.02em; }
+     don't blow past the screen edge on small phones. The scenes set
+     huge inline clamp() font sizes (48–200px) tuned for 16:9 desktop
+     capture; on a portrait phone those mins alone (e.g. 80px) clip the
+     scene. A single !important clamp beats the non-important inline
+     style and keeps the hierarchy proportional to the viewport. */
+  .font-display {
+    letter-spacing: -0.02em;
+    font-size: clamp(20px, 8vw, 50px) !important;
+    line-height: 1.1 !important;
+  }
+
+  /* The scenes are vertically centered with no scroll, so the desktop
+     rhythm (mb-12=3rem, mb-8, mt-6 …) pushes content past the phone
+     viewport and it clips top/bottom. Tighten it so each scene fits. */
+  .mb-12 { margin-bottom: 1rem !important; }
+  .mb-8  { margin-bottom: 0.75rem !important; }
+  .mt-6  { margin-top: 0.5rem !important; }
+  .mt-3  { margin-top: 0.35rem !important; }
+  .mt-2  { margin-top: 0.3rem !important; }
+  .mt-1  { margin-top: 0.2rem !important; }
+
+  /* The corner brand lockup is duplicated by the native onboarding
+     top bar (and the page chrome on web /demo) — hide it on phones so
+     the scene gets the full top of the viewport instead of a cramped
+     double logo. */
+  .absolute.top-10.left-10 { display: none !important; }
+
+  /* The Outcomes / Map scenes stack three tall panels in portrait. Trim
+     the panel padding and the fixed chart height so the column is short
+     enough that FitStage scales it only mildly and the headline above it
+     ("Every dispatch is traced…") stays on screen instead of clipping. */
+  .surface { padding: 0.85rem !important; }
+  .ba-chart { height: 130px !important; }
+  .space-y-2 > * + * { margin-top: 0.4rem !important; }
 }
 
 /* Extra squeeze for very small / short viewports */

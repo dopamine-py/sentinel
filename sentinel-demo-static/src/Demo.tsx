@@ -1101,7 +1101,7 @@ function BeforeAfterChart({ p }: { p: number }) {
   const afterH = 0.31; // 3.1 / 10
 
   return (
-    <div className="mt-4 flex items-end justify-around gap-6" style={{ height: 220 }}>
+    <div className="ba-chart mt-4 flex items-end justify-around gap-6" style={{ height: 220 }}>
       <ChartBar
         label="Before"
         sublabel="9.2 / 10"
@@ -1266,30 +1266,55 @@ function FitStage({
   maxWidth?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [activePad, setActivePad] = useState(pad);
+  const [phone, setPhone] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    const box = boxRef.current;
+    if (!el || !box) return;
     const measure = () => {
-      const cw = Math.max(1, window.innerWidth - pad * 2);
-      const ch = Math.max(1, window.innerHeight - pad * 2);
+      const isPhone = window.innerWidth < 760;
+      setPhone(isPhone);
+      // Phones get a tighter inset so the scene uses the screen rather
+      // than floating small inside wide desktop padding.
+      const p = isPhone ? 10 : pad;
+      setActivePad(p);
+      // Measure the on-screen stage box itself (not window) so the fit is
+      // correct regardless of the native top bar / safe-area chrome that
+      // sits above the WebView in the mobile onboarding.
+      const cw = Math.max(1, box.clientWidth - p * 2);
+      const ch = Math.max(1, box.clientHeight - p * 2);
       const nw = el.offsetWidth || 1;
       const nh = el.offsetHeight || 1;
       const s = Math.min(1, cw / nw, ch / nh);
       setScale(s > 0 ? s : 1);
     };
     measure();
+    // The WebView height settles after layout/safe-area — re-measure on a
+    // few frames so the very first paint is already correctly scaled and
+    // nothing (the headline especially) flashes clipped.
+    const raf = requestAnimationFrame(measure);
+    const t0 = setTimeout(measure, 80);
+    const t1 = setTimeout(measure, 260);
+    const t2 = setTimeout(measure, 600);
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== "undefined") {
       ro = new ResizeObserver(measure);
       ro.observe(el);
+      ro.observe(box);
     }
     window.addEventListener("resize", measure);
     // Content animates (rows appear, counter grows) — re-check briefly.
     const iv = setInterval(measure, 600);
     return () => {
       if (ro) ro.disconnect();
+      cancelAnimationFrame(raf);
+      clearTimeout(t0);
+      clearTimeout(t1);
+      clearTimeout(t2);
       window.removeEventListener("resize", measure);
       clearInterval(iv);
     };
@@ -1297,8 +1322,11 @@ function FitStage({
 
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center overflow-hidden"
-      style={{ padding: pad }}
+      ref={boxRef}
+      className={`absolute inset-0 flex justify-center overflow-hidden ${
+        phone ? "items-start" : "items-center"
+      }`}
+      style={{ padding: activePad }}
     >
       <div
         ref={ref}
@@ -1306,7 +1334,9 @@ function FitStage({
           width: "100%",
           maxWidth,
           transform: `scale(${scale})`,
-          transformOrigin: "center center",
+          // On phones pivot from the top so the headline can never be
+          // clipped — any leftover slack falls below the fold instead.
+          transformOrigin: phone ? "top center" : "center center",
           transition: "transform 250ms ease-out",
         }}
       >
