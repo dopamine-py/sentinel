@@ -72,16 +72,33 @@ def _safe_llm(system: str, user: str, max_tokens: int = 512, retries: int = 1) -
                 temperature=0.1,
                 max_output_tokens=max_tokens,
             )
+            text = (raw or "").strip()
+            if not text:
+                raise ValueError("empty LLM response")
             # Some models still emit markdown fences (```json …```) even
             # when asked for application/json — strip them defensively so
             # one stray fence doesn't trigger the whole fallback path.
-            text = raw.strip()
             if text.startswith("```"):
                 text = text.strip("`")
                 if text.lower().startswith("json"):
                     text = text[4:]
                 text = text.strip()
-            return json.loads(text), None
+            try:
+                return json.loads(text), None
+            except json.JSONDecodeError:
+                # Real-world LLM output occasionally has unescaped
+                # newlines/quotes inside string values (esp. when
+                # translating Urdu signal text). json_repair handles
+                # those without changing well-formed JSON.
+                try:
+                    from json_repair import repair_json
+                except ImportError:
+                    raise
+                repaired = repair_json(text, return_objects=True)
+                if isinstance(repaired, (dict, list)):
+                    logger.info("LLM JSON repaired via json_repair")
+                    return (repaired if isinstance(repaired, dict) else {"items": repaired}), None
+                raise json.JSONDecodeError("json_repair produced non-dict", text, 0)
         except Exception as exc:
             msg = str(exc)
             last_err = msg.splitlines()[0][:200] if msg else exc.__class__.__name__
@@ -127,7 +144,8 @@ Return a JSON object with:
   ],
   "total_signals": <int>,
   "locations_mentioned": ["<list of unique locations>"]
-}"""
+}
+Output strict JSON only. Inside any string value, escape newlines as \\n and double-quotes as \\". Do not wrap the response in markdown fences."""
 
 
 class SignalIngestionAgent:
@@ -211,7 +229,8 @@ Return a JSON object with:
   "contributing_signals": ["<signal ids that confirm crisis>"],
   "reasoning": "<step-by-step reasoning for your determination>"
 }
-Consider: signal convergence (multiple sources agreeing), location clustering, keyword density, weather + traffic correlation."""
+Consider: signal convergence (multiple sources agreeing), location clustering, keyword density, weather + traffic correlation.
+Output strict JSON only. Inside any string value, escape newlines as \\n and double-quotes as \\". Do not wrap the response in markdown fences."""
 
 
 _CRISIS_KEYWORDS = {
@@ -379,7 +398,8 @@ Return a JSON object with:
   "infrastructure_risk": "<description of infrastructure at risk>",
   "time_sensitivity": "<immediate|within_1hr|within_4hr|within_24hr>",
   "reasoning": "<analytical reasoning combining all signals>"
-}"""
+}
+Output strict JSON only. Inside any string value, escape newlines as \\n and double-quotes as \\". Do not wrap the response in markdown fences."""
 
 
 class SituationAnalysisAgent:
@@ -466,7 +486,8 @@ Return a JSON object with:
   "coordination_note": "<how these actions work together>",
   "reasoning": "<planning rationale>"
 }
-Generate 4-6 concrete, realistic actions. Be specific about roads, areas, and resources."""
+Generate 4-6 concrete, realistic actions. Be specific about roads, areas, and resources.
+Output strict JSON only. Inside any string value, escape newlines as \\n and double-quotes as \\". Do not wrap the response in markdown fences."""
 _DEFAULT_ACTIONS: dict[str, list[dict]] = {
     "urban_flooding": [
         {"action_type": "traffic_reroute", "description": "Redirect traffic from G-10 Main Road via Kashmir Highway and IJP Road", "priority": 1, "target_area": "G-10, I-8 Corridor", "assigned_to": "Traffic Control", "estimated_impact": "~60% congestion reduction within 30 min"},
@@ -780,7 +801,8 @@ Return a JSON object with:
   "remaining_risks": ["<risk 1>", "<risk 2>"],
   "recommendations": ["<follow-up recommendation 1>", ...],
   "reasoning": "<evaluation rationale>"
-}"""
+}
+Output strict JSON only. Inside any string value, escape newlines as \\n and double-quotes as \\". Do not wrap the response in markdown fences."""
 
 
 class OutcomeEvaluationAgent:

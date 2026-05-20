@@ -10,6 +10,14 @@ requests>=2.31.0
 # templated text, and the UI ends up looking like seeded demo data.
 google-genai>=0.3.0,<2.0.0
 
+# Tolerant JSON parser for LLM output. Even with
+# response_mime_type=application/json Gemini occasionally emits
+# unescaped newlines / quotes inside string values (esp. when
+# translating Urdu / Roman-Urdu signal text). json_repair handles the
+# common LLM failure modes so the pipeline doesn't fall back to
+# templates for a stray backslash.
+json-repair>=0.30.0,<1.0.0
+
 # Data ingestion
 feedparser>=6.0.0
 beautifulsoup4>=4.12.0
