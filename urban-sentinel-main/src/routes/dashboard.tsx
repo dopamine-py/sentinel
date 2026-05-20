@@ -187,61 +187,61 @@ function Dashboard() {
       let result: Result;
       const backendScenario = backendIdFor(scenarioId);
 
-      if (backend === "online") {
-        try {
-          const startRes = await triggerCrisisAsync({
-            scenario: backendScenario,
-            custom_signals: signal.trim() ? [signal.trim()] : [],
-          });
-          const runId = startRes.run_id;
+      // Always attempt the live backend. The heartbeat probe can lag a
+      // cold-starting Render instance by 30–50s while its 6s timeout
+      // declares "offline" — gating the run on that cached flag locked
+      // users into mock data even when the backend was actually working.
+      // Fall through to mock only if the run call itself errors.
+      try {
+        const startRes = await triggerCrisisAsync({
+          scenario: backendScenario,
+          custom_signals: signal.trim() ? [signal.trim()] : [],
+        });
+        const runId = startRes.run_id;
+        // We're talking to the backend successfully → reflect that in the badge.
+        setBackend("online");
 
-          await new Promise<void>((resolve) => {
-            const evtSource = new EventSource(`/api/sentinel/ciro/runs/${runId}/stream`);
-            evtSource.onmessage = (event) => {
-              if (event.data === "[DONE]") {
-                evtSource.close();
-                resolve();
-              } else {
-                try {
-                  const t = JSON.parse(event.data);
-                  if (t.error) {
-                    evtSource.close();
-                    resolve();
-                  } else {
-                    setLiveTraces((prev) => {
-                      const st = adaptTraceStep(t, prev.length);
-                      const existing = prev.findIndex((x) => x.step === st.step);
-                      if (existing >= 0) {
-                        const copy = [...prev];
-                        copy[existing] = st;
-                        return copy;
-                      }
-                      return [...prev, st];
-                    });
-                  }
-                } catch (e) {}
-              }
-            };
-            evtSource.onerror = () => {
+        await new Promise<void>((resolve) => {
+          const evtSource = new EventSource(`/api/sentinel/ciro/runs/${runId}/stream`);
+          evtSource.onmessage = (event) => {
+            if (event.data === "[DONE]") {
               evtSource.close();
               resolve();
-            };
-          });
+            } else {
+              try {
+                const t = JSON.parse(event.data);
+                if (t.error) {
+                  evtSource.close();
+                  resolve();
+                } else {
+                  setLiveTraces((prev) => {
+                    const st = adaptTraceStep(t, prev.length);
+                    const existing = prev.findIndex((x) => x.step === st.step);
+                    if (existing >= 0) {
+                      const copy = [...prev];
+                      copy[existing] = st;
+                      return copy;
+                    }
+                    return [...prev, st];
+                  });
+                }
+              } catch (e) {}
+            }
+          };
+          evtSource.onerror = () => {
+            evtSource.close();
+            resolve();
+          };
+        });
 
-          result = await getRun(runId);
-          setSource("live");
-        } catch (e) {
-          if (!(e instanceof BackendUnavailable)) throw e;
-          // Backend died mid-flight → graceful fallback
-          result = mockResult(scenarioId, scenario.label);
-          setSource("demo");
-          setBackend("offline");
-        }
-      } else {
-        // Offline → mock dataset with a small delay so progress feels real
-        await new Promise((r) => setTimeout(r, 3000));
+        result = await getRun(runId);
+        setSource("live");
+      } catch (e) {
+        if (!(e instanceof BackendUnavailable)) throw e;
+        // Backend genuinely unreachable → honest demo fallback.
         result = mockResult(scenarioId, scenario.label);
         setSource("demo");
+        setBackend("offline");
       }
 
       setHistory((h) => [result, ...h].slice(0, 10));
@@ -274,28 +274,14 @@ function Dashboard() {
       });
     }, 200);
 
-    // No backend reachable (e.g. the public Cloudflare deploy) → run a
-    // satisfying, varied bundled result instead of an error. Judges clicking
-    // around the public URL always get a full orchestration, never a dead end.
-    if (backend !== "online") {
-      try {
-        await new Promise((r) => setTimeout(r, 2600));
-        const result = bundledScanResult();
-        setSource("demo");
-        setHistory((h) => [result, ...h].slice(0, 10));
-        setActive(result);
-        setTab("orchestration");
-      } finally {
-        clearInterval(tickHandle);
-        setRunning(false);
-        setProgress(null);
-      }
-      return;
-    }
-
+    // Always attempt the live scan first — the heartbeat probe can lag
+    // a cold-starting Render instance and a stale "offline" flag was
+    // dropping users straight onto mock data even when the backend was
+    // actually working. If the live call really fails we fall back below.
     try {
       const startRes = await triggerLiveScanAsync();
       const runId = startRes.run_id;
+      setBackend("online");
 
       await new Promise<void>((resolve) => {
         const evtSource = new EventSource(`/api/sentinel/ciro/runs/${runId}/stream`);
