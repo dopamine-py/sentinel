@@ -1,8 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import { runLiveScan } from './api';
 
-const ACCENT = '#67e8f9';
-const OK     = '#34d399';
+const ALERT = '#F5402C';
+const OK    = '#34d399';
 
 // Foreground display config
 Notifications.setNotificationHandler({
@@ -50,7 +50,7 @@ export async function sendCrisisAlert(arg1, arg2) {
       title,
       body,
       data: { runId },
-      color: ACCENT,
+      color: ALERT,
       priority: 'max',
       sound: true,
     },

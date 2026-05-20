@@ -5,6 +5,7 @@ import {
   StyleSheet, TextInput, Alert, Vibration,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Radar, PlayCircle, Activity, Wifi, WifiOff } from 'lucide-react-native';
 
 import {
@@ -32,6 +33,7 @@ const SCENARIO_PRESETS = [
 ];
 
 export default function HomeScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [scenarios, setScenarios] = useState([]);
   const [scenario, setScenario] = useState('urban_flooding');
   const [customSignal, setCustomSignal] = useState('');
@@ -117,7 +119,7 @@ export default function HomeScreen({ navigation }) {
       }
     >
       {/* Header */}
-      <View style={s.headerRow}>
+      <View style={[s.headerRow, { paddingTop: insets.top + spacing(2) }]}>
         <SentinelMark />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <LiveBadge online={backendOnline} lastUpdate={lastUpdate} />

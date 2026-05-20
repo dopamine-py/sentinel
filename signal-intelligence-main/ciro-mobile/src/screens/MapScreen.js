@@ -3,6 +3,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { MapPin } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CRISIS_META } from '../api';
 import {
   SentinelMark, Card, Eyebrow, RadarDisplay, SeverityPill, StatusPill, PulseDot,
@@ -11,8 +12,16 @@ import { useLiveRuns, formatAgo } from '../hooks/useLive';
 import { colors, radii, spacing, type } from '../ui/theme';
 
 export default function MapScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { runs: liveRuns, lastUpdate, online, refresh } = useLiveRuns({ intervalMs: 6000 });
   const runs = (liveRuns || []).slice(0, 16);
+
+  // Derive the radar tally from real runs instead of fixed numbers.
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const sevOf = (r) => String(r.severity || '').toLowerCase();
+  const criticalCount = runs.filter((r) => sevOf(r) === 'critical').length;
+  const highCount = runs.filter((r) => sevOf(r) === 'high').length;
+  const watchingCount = runs.length - criticalCount - highCount;
 
   const [refreshing, setRefreshing] = useState(false);
   const manual = useCallback(async () => {
@@ -41,7 +50,7 @@ export default function MapScreen({ navigation }) {
         />
       }
     >
-      <View style={s.headerRow}>
+      <View style={[s.headerRow, { paddingTop: insets.top + spacing(2) }]}>
         <SentinelMark />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <PulseDot color={online ? colors.statusOk : colors.statusWarn} size={5} />
@@ -57,9 +66,9 @@ export default function MapScreen({ navigation }) {
           <RadarDisplay size={240} />
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 6 }}>
-          <RadarStat label="CRITICAL" value="02" color={colors.statusCritical} />
-          <RadarStat label="HIGH"     value="04" color={colors.statusWarn} />
-          <RadarStat label="WATCHING" value="09" color={colors.accentCyan} />
+          <RadarStat label="CRITICAL" value={pad2(criticalCount)} color={colors.statusCritical} />
+          <RadarStat label="HIGH"     value={pad2(highCount)}     color={colors.statusWarn} />
+          <RadarStat label="WATCHING" value={pad2(Math.max(0, watchingCount))} color={colors.accentCyan} />
         </View>
       </Card>
 

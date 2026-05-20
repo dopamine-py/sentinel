@@ -5,12 +5,13 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Radar as RadarIcon, MapPin, Settings as SettingsIcon } from 'lucide-react-native';
+import { Radar as RadarIcon, MapPin, Radio, Settings as SettingsIcon } from 'lucide-react-native';
 
-import HomeScreen     from './src/screens/HomeScreen';
-import DetailScreen   from './src/screens/DetailScreen';
-import MapScreen      from './src/screens/MapScreen';
-import SettingsScreen from './src/screens/SettingsScreen';
+import HomeScreen      from './src/screens/HomeScreen';
+import DetailScreen    from './src/screens/DetailScreen';
+import MapScreen       from './src/screens/MapScreen';
+import LiveFeedScreen  from './src/screens/LiveFeedScreen';
+import SettingsScreen  from './src/screens/SettingsScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -92,6 +93,7 @@ function MainTabs() {
           const Icon =
             route.name === 'Console' ? RadarIcon :
             route.name === 'Map'     ? MapPin     :
+            route.name === 'Feed'    ? Radio      :
                                         SettingsIcon;
           return (
             <View style={{
@@ -107,6 +109,7 @@ function MainTabs() {
     >
       <Tab.Screen name="Console"  component={HomeStack} />
       <Tab.Screen name="Map"      component={MapStack} />
+      <Tab.Screen name="Feed"     component={LiveFeedScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );

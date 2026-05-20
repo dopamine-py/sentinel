@@ -15,6 +15,7 @@ import {
   Animated, Easing, Pressable,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowRight, Radio, ShieldCheck, Brain, Workflow, Activity, Sparkles } from 'lucide-react-native';
 import { colors, fonts, radii, spacing, type as typeStyle } from '../ui/theme';
 import { SentinelMark, PulseDot } from '../ui/primitives';
@@ -25,6 +26,7 @@ const LOAD_TIMEOUT_MS = 4000;        // local HTML loads fast; safety net only
 const AUTO_ADVANCE_MS = 65000;       // after demo length, auto-show CTA
 
 export default function OnboardingScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   // Demo is bundled — start in 'loading' and flip to 'demo' on WebView ready.
   const [phase, setPhase] = useState('loading'); // 'loading' | 'demo' | 'native' | 'cta'
   const timeoutRef = useRef(null);
@@ -90,7 +92,7 @@ export default function OnboardingScreen({ navigation }) {
               so the tap always lands on RN and never gets swallowed by
               the Android WebView. Zero dependence on the WebView→RN
               bridge or the demo's internal state. */}
-          <View style={styles.topBar}>
+          <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
             <SentinelMark size="sm" />
             <Pressable
               onPress={completeOnboarding}

@@ -7,6 +7,7 @@ import {
 import { CheckCircle2, RefreshCw, Wifi, WifiOff, Trash2, Play } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getApiBase, getDefaultApiBase, setApiBase, loadApiBase, isBackendOnline } from '../api';
 import {
@@ -15,6 +16,7 @@ import {
 import { colors, radii, spacing, type } from '../ui/theme';
 
 export default function SettingsScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const replayIntro = async () => {
     try {
       await AsyncStorage.removeItem('hasSeenOnboarding');
@@ -81,6 +83,7 @@ export default function SettingsScreen({ navigation }) {
           title: 'Sentinel · test alert',
           body: 'You’ll see this for live, high-severity incidents.',
           data: { test: true },
+          color: '#F5402C',
         },
         trigger: null,
       });
@@ -91,7 +94,7 @@ export default function SettingsScreen({ navigation }) {
 
   return (
     <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: spacing(8) }}>
-      <View style={s.headerRow}>
+      <View style={[s.headerRow, { paddingTop: insets.top + spacing(2) }]}>
         <SentinelMark />
         <StatusPill state="online" label={`v ${require('../../package.json').version || '1.0.0'}`} />
       </View>
@@ -103,9 +106,10 @@ export default function SettingsScreen({ navigation }) {
           API endpoint
         </Text>
         <Text style={{ ...type.body, fontSize: 12.5, color: colors.textSecondary, marginTop: 6, lineHeight: 18 }}>
-          The FastAPI host for the signal-intelligence pipeline. Defaults to{' '}
-          <Text style={{ ...type.mono, color: colors.textPrimary }}>:8000</Text> on web and the bundled
-          tunnel on native. Override with your own host for development.
+          The FastAPI host for the signal-intelligence pipeline. Defaults to the
+          hosted backend so the app works out of the box. Point it at{' '}
+          <Text style={{ ...type.mono, color: colors.textPrimary }}>:8000</Text> (or your LAN IP)
+          to run against a local backend.
         </Text>
 
         <TextInput
@@ -190,7 +194,7 @@ export default function SettingsScreen({ navigation }) {
         <View style={{ marginTop: 8, gap: 6 }}>
           <Row label="Platform"   value={Platform.OS.toUpperCase()} />
           <Row label="App version" value={String(require('../../package.json').version || '1.0.0')} />
-          <Row label="Sentinel"    value="sentinel-ops · v4.7" />
+          <Row label="Pipeline"    value="6-agent CIRO" />
         </View>
       </Card>
     </ScrollView>

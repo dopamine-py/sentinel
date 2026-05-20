@@ -152,3 +152,73 @@ export function formatAgo(ts) {
   const h = Math.round(m / 60);
   return `${h}h ago`;
 }
+
+/* ============================================================
+   useLiveSignals — pull real input_signals from the latest run.
+   Mirrors the web dashboard's right-rail live signal ticker.
+   ============================================================ */
+
+const SOURCE_COLOR = {
+  social_media: '#818cf8',  // indigo
+  weather_api:  '#fbbf24',  // amber
+  traffic_api:  '#a78bfa',  // violet
+  complaint:    '#fb7185',  // rose
+  sensor:       '#34d399',  // emerald
+};
+
+const SOURCE_LABEL = {
+  social_media: 'Social',
+  weather_api:  'Weather',
+  traffic_api:  'Traffic',
+  complaint:    'Citizen',
+  sensor:       'Sensor',
+};
+
+function relTime(iso) {
+  try {
+    const d = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+    if (d < 60) return `${d}s`;
+    const m = Math.round(d / 60);
+    if (m < 60) return `${m}m`;
+    const h = Math.round(m / 60);
+    return `${h}h`;
+  } catch { return '—'; }
+}
+
+export function useLiveSignals({ intervalMs = 6000, max = 40 } = {}) {
+  const { runs, online } = useLiveRuns({ intervalMs });
+  const [signals, setSignals] = useState([]);
+  const inflight = useRef(null);
+
+  const newestId = (runs[0] && runs[0].run_id) || null;
+
+  useEffect(() => {
+    if (!newestId) return;
+    if (inflight.current === newestId) return;
+    inflight.current = newestId;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const detail = await fetchRun(newestId);
+        if (cancelled || !detail) return;
+        const inputSignals = detail.input_signals || [];
+        const mapped = inputSignals.slice(0, max).map((s) => ({
+          id: s.id || `sig-${Math.random().toString(36).slice(2, 8)}`,
+          src: SOURCE_LABEL[String(s.source)] || String(s.source || '').replace(/_/g, ' '),
+          color: SOURCE_COLOR[String(s.source)] || '#67e8f9',
+          text: String(s.raw_text || ''),
+          geo: String(s.location || ''),
+          ts: relTime(String(s.timestamp || '')),
+          meta: s.metadata || {},
+        })).filter((s) => s.text);
+        setSignals(mapped);
+      } catch {}
+    })();
+
+    return () => { cancelled = true; };
+  }, [newestId, max]);
+
+  return { signals, online };
+}
+

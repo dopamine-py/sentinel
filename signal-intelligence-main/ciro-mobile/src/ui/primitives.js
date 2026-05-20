@@ -532,6 +532,3 @@ export function StatTile({ label, value, hint }) {
 const s = StyleSheet.create({
   markRow: { flexDirection: 'row', alignItems: 'center' },
 });
-
-/* Suppress unused var warnings for Rect (kept for future use) */
-void Rect;
